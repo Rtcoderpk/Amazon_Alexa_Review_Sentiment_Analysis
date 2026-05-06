@@ -46,9 +46,9 @@ import re
 
 #Load the data
 
-pd.read_csv("amazon_alexa.tsv", delimiter="\t", quoting=3)
-print(f"Dataset shape : {data.shape}")
+data = pd.read_csv("amazon_alexa.tsv", delimiter="\t", quoting=3)
 
+print(f"Dataset shape : {data.shape}")
 data.head()
 
 #Column names
