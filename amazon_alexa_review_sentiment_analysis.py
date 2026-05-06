@@ -46,8 +46,7 @@ import re
 
 #Load the data
 
-data = pd.read_csv(r"/content/amazon_alexa.tsv", delimiter = '\t', quoting = 3)
-
+pd.read_csv("amazon_alexa.tsv", delimiter="\t", quoting=3)
 print(f"Dataset shape : {data.shape}")
 
 data.head()
