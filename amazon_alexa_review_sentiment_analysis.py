@@ -10,10 +10,9 @@ from nltk.stem.porter import PorterStemmer
 import nltk
 nltk.download('stopwords')
 
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import TfidfVectorizer
 from sklearn.model_selection import train_test_split
-from sklearn.preprocessing import MinMaxScaler
-from xgboost import XGBClassifier
+from sklearn.linear_model import LogisticRegression
 from sklearn.metrics import accuracy_score
 
 # =========================
@@ -26,7 +25,7 @@ stemmer = PorterStemmer()
 os.makedirs("Models", exist_ok=True)
 
 # =========================
-# CLEAN TEXT FUNCTION (IMPORTANT FIX)
+# CLEAN TEXT FUNCTION
 # =========================
 
 def clean_text(text):
@@ -39,78 +38,69 @@ def clean_text(text):
 # STREAMLIT UI
 # =========================
 
-st.title("📊 Amazon Alexa Sentiment Analysis")
+st.title("📊 Amazon Alexa Sentiment Analysis (Improved Model)")
 
 # =========================
-# LOAD DATA (FIXED PATH)
+# LOAD DATA
 # =========================
 
 data = pd.read_csv("amazon_alexa.tsv", delimiter="\t", quoting=3)
 data.dropna(inplace=True)
 
 # =========================
-# PREPROCESS DATA
+# PREPROCESS
 # =========================
 
-corpus = []
-
-for i in range(len(data)):
-    review = clean_text(data.iloc[i]['verified_reviews'])
-    corpus.append(review)
+corpus = [clean_text(text) for text in data['verified_reviews']]
 
 # =========================
-# VECTORIZATION
+# TF-IDF VECTOR (BETTER THAN COUNT VECTORIZER)
 # =========================
 
-cv = CountVectorizer(max_features=2500)
-X = cv.fit_transform(corpus).toarray()
+tfidf = TfidfVectorizer(max_features=5000, ngram_range=(1,2))
+X = tfidf.fit_transform(corpus).toarray()
 y = data['feedback'].values
 
-# SAVE VECTOR
-pickle.dump(cv, open('Models/countVectorizer.pkl', 'wb'))
+pickle.dump(tfidf, open("Models/tfidf.pkl", "wb"))
 
 # =========================
 # TRAIN TEST SPLIT
 # =========================
 
 X_train, X_test, y_train, y_test = train_test_split(
-    X, y, test_size=0.3, random_state=15
+    X, y, test_size=0.25, random_state=42
 )
 
 # =========================
-# SCALING
+# MODEL (BEST FOR SENTIMENT)
 # =========================
 
-scaler = MinMaxScaler()
-X_train_scl = scaler.fit_transform(X_train)
-X_test_scl = scaler.transform(X_test)
-
-pickle.dump(scaler, open('Models/scaler.pkl', 'wb'))
-
-# =========================
-# MODEL TRAINING
-# =========================
-
-model = XGBClassifier(
-    eval_metric='logloss',
-    use_label_encoder=False
+model = LogisticRegression(
+    max_iter=1000,
+    class_weight='balanced'  # IMPORTANT FIX
 )
 
-model.fit(X_train_scl, y_train)
+model.fit(X_train, y_train)
 
 # =========================
 # ACCURACY
 # =========================
 
-train_acc = model.score(X_train_scl, y_train)
-test_acc = model.score(X_test_scl, y_test)
+train_acc = model.score(X_train, y_train)
+test_acc = model.score(X_test, y_test)
 
 st.subheader("Model Accuracy")
 st.write("Train Accuracy:", train_acc)
 st.write("Test Accuracy:", test_acc)
 
 # =========================
-# USER INPUT
+# SAVE MODEL
+# =========================
+
+pickle.dump(model, open("Models/model.pkl", "wb"))
+
+# =========================
+# USER INPUT PREDICTION
 # =========================
 
 st.subheader("🧪 Test Your Review")
@@ -123,21 +113,16 @@ if st.button("Predict"):
         st.warning("Please enter a review")
 
     else:
-        cleaned = clean_text(user_input)
 
-        vector = cv.transform([cleaned]).toarray()
-        vector = scaler.transform(vector)
+        cleaned = clean_text(user_input)
+        vector = tfidf.transform([cleaned]).toarray()
 
         prediction = model.predict(vector)[0]
         prob = model.predict_proba(vector)[0]
 
-        confidence = prob[1]
+        confidence = max(prob)
 
-        # =========================
-        # FIXED DECISION LOGIC
-        # =========================
-
-        if confidence >= 0.60:
-            st.success(f"Positive Review 👍 (Confidence: {confidence:.2f})")
+        if prediction == 1:
+            st.success(f"Positive Review 👍 ({confidence:.2f})")
         else:
-            st.error(f"Negative Review 👎 (Confidence: {confidence:.2f})")
+            st.error(f"Negative Review 👎 ({confidence:.2f})")
