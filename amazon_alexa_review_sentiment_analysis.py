@@ -18,6 +18,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 import nltk
+nltk.download('stopwords', quiet=True)
 from nltk.stem.porter import PorterStemmer
 nltk.download('stopwords')
 from nltk.corpus import stopwords
